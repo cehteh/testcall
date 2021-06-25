@@ -2,7 +2,7 @@
 name = "testcall"
 version = "0.1.0"
 edition = "2018"
-description = "companinon crate to 'BinTest', implements test facilities"
+description = "companinon crate to bintest, implements test facilities"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/cehteh/testcall.git"
 keywords = ["testing"]

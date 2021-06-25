@@ -16,8 +16,9 @@
 //!
 //!     myprogram.current_dir(Box::new(TempDir::new().expect("created tempdir")));
 //!     myprogram
-//!         .call(["--help"])
-//!         .assert_success();
+//!         .call(["--version"])
+//!         .assert_success()
+//!         .assert_stdout("myprogram 0.1.*");
 //! }
 //! ```
 //!
@@ -26,7 +27,6 @@
 //! New features will be added as needed, PR's are welcome. This is work in progress.
 //!
 //! Things to be done soon are:
-//!  * Regex filters for the stdout/stderr
 //!  * Populating TestDirs from template directories
 //!  * Validating directory contents
 //!
@@ -47,21 +47,35 @@ pub mod prelude {
     pub use crate::TestOutput;
 }
 
+enum ExeLocation<'a> {
+    BinTest {
+        executables: &'a BinTest,
+        name: &'static str,
+    },
+    External(&'static Path),
+}
+
 /// A TestCall object binds a BinTest::Command to a single executable and environment and
 /// provides functions to call this multiple times.
 pub struct TestCall<'a> {
-    executables: &'a BinTest,
-    name: &'static str,
+    executable: ExeLocation<'a>,
     dir: Option<Box<dyn TestDir>>,
     //PLANNED env: env_clear: env_remove...,
 }
 
 impl<'a> TestCall<'a> {
-    /// Creates a new testcall object for the executable 'name'
+    /// Creates a new testcall object for 'name' from the current crates executables.
     pub fn new(executables: &'a BinTest, name: &'static str) -> TestCall<'a> {
         TestCall {
-            executables,
-            name,
+            executable: ExeLocation::BinTest { executables, name },
+            dir: None,
+        }
+    }
+
+    /// Creates a new testcall object for an external command given by path.
+    pub fn external_command(path: &'static Path) -> TestCall<'a> {
+        TestCall {
+            executable: ExeLocation::External(path),
             dir: None,
         }
     }
@@ -80,7 +94,10 @@ impl<'a> TestCall<'a> {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        let mut command = self.executables.command(self.name);
+        let mut command = match self.executable {
+            ExeLocation::BinTest { executables, name } => executables.command(name),
+            ExeLocation::External(path) => Command::new(path),
+        };
         if let Some(dir) = &self.dir {
             command.current_dir(dir.path());
         }

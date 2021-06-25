@@ -27,6 +27,5 @@ New features will be added as needed, PR’s are welcome. This is work in progre
 
 Things to be done soon are:
 
- * Regex filters for the stdout/stderr
  * Populating TestDirs from template directories
  * Validating directory contents
