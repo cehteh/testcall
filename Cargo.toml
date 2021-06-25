@@ -1,6 +1,6 @@
 [package]
 name = "testcall"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2018"
 description = "companinon crate to 'BinTest', implements test facilities"
 license = "MIT OR Apache-2.0"
@@ -12,6 +12,7 @@ keywords = ["testing"]
 [dependencies]
 tempfile = "3.2"
 bintest = "1.0"
+regex = "1"
 
 [badges]
 maintenance = { status = "actively-developed" }

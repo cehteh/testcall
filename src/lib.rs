@@ -31,6 +31,7 @@
 //!  * Validating directory contents
 //!
 
+use regex::Regex;
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -91,23 +92,64 @@ impl<'a> TestCall<'a> {
 
 /// Augment std::process::Output with testing and assertions
 pub trait TestOutput {
+    /// Will panic when the program did not exited successful.
     #[track_caller]
     fn assert_success(&self) -> &Self;
 
+    /// Expects that the program exited with a failure.
     #[track_caller]
     fn assert_failure(&self) -> &Self;
+
+    /// Expects that the program exited with the provided code.
+    #[track_caller]
+    fn assert_exitcode(&self, code: i32) -> &Self;
+
+    /// Applies a regex match check to stdout, will panic when the match failed.
+    #[track_caller]
+    fn assert_stdout(&self, regex: &str) -> &Self;
+
+    /// Applies a regex match check to stderr, will panic when the match failed.
+    #[track_caller]
+    fn assert_stderr(&self, regex: &str) -> &Self;
 }
 
 impl TestOutput for Output {
-    #[track_caller]
     fn assert_success(&self) -> &Self {
-        assert!(self.status.success(), "expected successful exit status");
+        assert!(self.status.success(), "expected success at exit");
         self
     }
 
-    #[track_caller]
     fn assert_failure(&self) -> &Self {
-        assert_eq!(self.status.success(), false, "expected failure at exit");
+        assert!(!self.status.success(), "expected failure at exit");
+        self
+    }
+
+    fn assert_exitcode(&self, code: i32) -> &Self {
+        assert_eq!(self.status.code(), Some(code), "unexpected exitcode");
+        self
+    }
+
+    fn assert_stdout(&self, regex: &str) -> &Self {
+        let re = Regex::new(regex).expect("compiled regex");
+        let text = String::from_utf8_lossy(&self.stdout);
+        assert!(
+            re.is_match(&text),
+            "stdout does not match:\n{}\nstdout was:\n{}",
+            regex,
+            text
+        );
+        self
+    }
+
+    fn assert_stderr(&self, regex: &str) -> &Self {
+        let re = Regex::new(regex).expect("compiled regex");
+        let text = String::from_utf8_lossy(&self.stderr);
+        assert!(
+            re.is_match(&text),
+            "stderr does not match:\n{}\nstdout was:\n{}",
+            regex,
+            text
+        );
         self
     }
 }
