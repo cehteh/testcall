@@ -1,14 +1,47 @@
+//! Companinon crate to 'BinTest', implements test facilities
+//!
+//! # Description
+//!
+//! A TestCall uses BinTest and std::process::Command to wrap process execution in a way that
+//! is ergonomic to use for (repeated) testing. Few more test facilities are provided and will
+//! grow in future.
+//!
+//! # Example
+//!
+//! ```rust
+//! #[test]
+//! fn myprogram_test() {
+//!     let executables = BinTest::new();
+//!     let mut myprogram = TestCall::new(&executables, "myprogram");
+//!
+//!     myprogram.current_dir(Box::new(TempDir::new().expect("created tempdir")));
+//!     myprogram
+//!         .call(["--help"])
+//!         .assert_success();
+//! }
+//! ```
+//!
+//! # Future Plans
+//!
+//! New features will be added as needed, PR's are welcome. This is work in progress.
+//!
+//! Things to be done soon are:
+//!  * Regex filters for the stdout/stderr
+//!  * Populating TestDirs from template directories
+//!  * Validating directory contents
+//!
+
 use std::ffi::OsStr;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use tempfile::TempDir;
 
 use bintest::BinTest;
 
 // A TestCall object binds a BinTest::Command to a single executable and environment and
-// provides functions to call this multiple times
-struct TestCall<'a> {
+// provides functions to call this multiple times.
+pub struct TestCall<'a> {
     executables: &'a BinTest,
     name: &'static str,
     dir: Option<Box<dyn TestDir>>,
@@ -26,14 +59,15 @@ impl<'a> TestCall<'a> {
     }
 
     // Sets the current dir in which the next call shall execute
-    pub fn current_dir(&mut self, dir: Box<dyn TestDir>) {
+    pub fn current_dir(&mut self, dir: Box<dyn TestDir>) -> &mut Self {
         self.dir = Some(dir);
+        self
     }
 
     // Calls the executable with the given arguments and expects successful exit.
-    // Returns an Output object for further investigation.
+    // Returns a TestOutput object for further investigation.
     #[track_caller]
-    pub fn call<I, S>(&self, args: I) -> TestOutput
+    pub fn call<I, S>(&self, args: I) -> Output
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
@@ -44,30 +78,49 @@ impl<'a> TestCall<'a> {
         }
         //PLANNED: env vars
         let output = command.args(args).output().expect("called command");
-        TestOutput(output)
+        output
     }
 }
 
-// Wraps std::process::Output
-struct TestOutput(Output);
-
-//TODO: make this a trait
-impl TestOutput {
+/// Augment std::process::Output with testing and assertions
+pub trait TestOutput {
     #[track_caller]
-    pub fn assert_success(&self) -> &TestOutput {
-        assert!(self.0.status.success(), "expected successful exit status");
+    fn assert_success(&self) -> &Self;
+
+    #[track_caller]
+    fn assert_failure(&self) -> &Self;
+}
+
+impl TestOutput for Output {
+    #[track_caller]
+    fn assert_success(&self) -> &Self {
+        assert!(self.status.success(), "expected successful exit status");
         self
     }
 
     #[track_caller]
-    pub fn assert_failure(&self) -> &TestOutput {
-        assert!(self.0.status.success() == false, "expected failure at exit");
+    fn assert_failure(&self) -> &Self {
+        assert_eq!(self.status.success(), false, "expected failure at exit");
         self
     }
 }
 
-trait TestDir {
+/// Trait for test directoy objects
+pub trait TestDir {
+    /// Returns the underlying Path of an TestDir implementation
     fn path(&self) -> &Path;
+}
+
+impl TestDir for Path {
+    fn path(&self) -> &Path {
+        self
+    }
+}
+
+impl TestDir for PathBuf {
+    fn path(&self) -> &Path {
+        self.as_path()
+    }
 }
 
 impl TestDir for TempDir {
@@ -76,7 +129,9 @@ impl TestDir for TempDir {
     }
 }
 
-struct TempDirCleanup {
+/// Augment a TempDir with a custom callback function that can do additional cleanup work
+/// (like unmountinf filesystem etc.)
+pub struct TempDirCleanup {
     dir: TempDir,
     cleanup_fn: fn(&TempDir),
 }
@@ -94,6 +149,7 @@ impl TestDir for TempDirCleanup {
 }
 
 impl TempDirCleanup {
+    /// creates a temporary directory with a cleanup function to be called at drop time.
     pub fn new(cleanup_fn: fn(&TempDir)) -> io::Result<Self> {
         Ok(TempDirCleanup {
             dir: TempDir::new()?,
