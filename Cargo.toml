@@ -1,0 +1,17 @@
+[package]
+name = "testcall"
+version = "0.0.0"
+edition = "2018"
+description = "companinon crate to 'BinTest', implements test facilities"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/cehteh/testcall.git"
+keywords = ["testing"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tempfile = "3.2"
+bintest = "1.0"
+
+[badges]
+maintenance = { status = "actively-developed" }
