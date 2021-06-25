@@ -39,8 +39,15 @@ use tempfile::TempDir;
 
 use bintest::BinTest;
 
-// A TestCall object binds a BinTest::Command to a single executable and environment and
-// provides functions to call this multiple times.
+/// exporting things for convinience
+pub mod prelude {
+    pub use crate::TestCall;
+    pub use crate::TestDir;
+    pub use crate::TestOutput;
+}
+
+/// A TestCall object binds a BinTest::Command to a single executable and environment and
+/// provides functions to call this multiple times.
 pub struct TestCall<'a> {
     executables: &'a BinTest,
     name: &'static str,
@@ -49,7 +56,7 @@ pub struct TestCall<'a> {
 }
 
 impl<'a> TestCall<'a> {
-    // Creates a new testcall object for the executable 'name'
+    /// Creates a new testcall object for the executable 'name'
     pub fn new(executables: &'a BinTest, name: &'static str) -> TestCall<'a> {
         TestCall {
             executables,
@@ -58,14 +65,14 @@ impl<'a> TestCall<'a> {
         }
     }
 
-    // Sets the current dir in which the next call shall execute
+    /// Sets the current dir in which the next call shall execute
     pub fn current_dir(&mut self, dir: Box<dyn TestDir>) -> &mut Self {
         self.dir = Some(dir);
         self
     }
 
-    // Calls the executable with the given arguments and expects successful exit.
-    // Returns a TestOutput object for further investigation.
+    /// Calls the executable with the given arguments and expects successful exit.
+    /// Returns a TestOutput object for further investigation.
     #[track_caller]
     pub fn call<I, S>(&self, args: I) -> Output
     where
