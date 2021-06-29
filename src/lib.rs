@@ -18,7 +18,7 @@
 //!     myprogram
 //!         .call(["--version"])
 //!         .assert_success()
-//!         .assert_stdout("myprogram 0.1.*");
+//!         .assert_stdout_utf8("myprogram 0.1.*");
 //! }
 //! ```
 //!
@@ -31,7 +31,6 @@
 //!  * Validating directory contents
 //!
 
-use regex::Regex;
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -122,12 +121,14 @@ pub trait TestOutput {
     fn assert_exitcode(&self, code: i32) -> &Self;
 
     /// Applies a regex match check to stdout, will panic when the match failed.
+    /// This check matches utf8 text, stdout is lossy convered to utf8 first.
     #[track_caller]
-    fn assert_stdout(&self, regex: &str) -> &Self;
+    fn assert_stdout_utf8(&self, regex: &str) -> &Self;
 
     /// Applies a regex match check to stderr, will panic when the match failed.
+    /// This check matches utf8 text, stdout is lossy convered to utf8 first.
     #[track_caller]
-    fn assert_stderr(&self, regex: &str) -> &Self;
+    fn assert_stderr_utf8 (&self, regex: &str) -> &Self;
 }
 
 impl TestOutput for Output {
@@ -146,7 +147,8 @@ impl TestOutput for Output {
         self
     }
 
-    fn assert_stdout(&self, regex: &str) -> &Self {
+    fn assert_stdout_utf8(&self, regex: &str) -> &Self {
+        use regex::{Captures, Regex};
         let re = Regex::new(regex).expect("compiled regex");
         let text = String::from_utf8_lossy(&self.stdout);
         assert!(
@@ -158,7 +160,8 @@ impl TestOutput for Output {
         self
     }
 
-    fn assert_stderr(&self, regex: &str) -> &Self {
+    fn assert_stderr_utf8(&self, regex: &str) -> &Self {
+        use regex::{Captures, Regex};
         let re = Regex::new(regex).expect("compiled regex");
         let text = String::from_utf8_lossy(&self.stderr);
         assert!(
