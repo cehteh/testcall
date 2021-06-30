@@ -40,11 +40,12 @@
 //!  * Populating TestDirs from template directories
 //!  * Validating directory contents
 //!
-
 mod output;
 mod testcall;
 mod testdir;
+mod regex;
 
 pub use crate::testcall::TestCall;
 pub use crate::testdir::{TestDir, TempDirCleanup};
-pub use crate::output::{TestOutput, CaptureKey};
+pub use crate::output::TestOutput;
+pub use crate::regex::CaptureKey;

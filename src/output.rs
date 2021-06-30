@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::process::Output;
 
+use crate::CaptureKey;
+
 /// Augment std::process::Output with testing and assertions
 pub trait TestOutput {
     /// Will panic when the program did not exited successful.
@@ -63,97 +65,53 @@ impl TestOutput for Output {
     //PLANNED: make a HashMap<String, Regex> to cache compiled regex
 
     fn assert_stdout_utf8(&self, regex: &str) -> &Self {
-        use regex::Regex;
-        let re = Regex::new(regex).expect("compiled regex");
-        let text = String::from_utf8_lossy(&self.stdout);
+        let (ok, utf8) = crate::regex::regex_match_utf8(&self.stdout, regex);
         assert!(
-            re.is_match(&text),
+            ok,
             "stdout does not match:\n{}\nstdout was:\n{}",
-            regex,
-            text
+            regex, utf8
         );
         self
     }
 
     fn assert_stderr_utf8(&self, regex: &str) -> &Self {
-        use regex::Regex;
-        let re = Regex::new(regex).expect("compiled regex");
-        let text = String::from_utf8_lossy(&self.stderr);
+        let (ok, utf8) = crate::regex::regex_match_utf8(&self.stderr, regex);
         assert!(
-            re.is_match(&text),
-            "stderr does not match:\n{}\nstdout was:\n{}",
-            regex,
-            text
+            ok,
+            "stderr does not match:\n{}\nstderr was:\n{}",
+            regex, utf8
         );
         self
     }
 
     fn assert_stdout_bytes(&self, regex: &str) -> &Self {
-        use regex::bytes::Regex;
-        let re = Regex::new(regex).expect("compiled regex");
+        let (ok, bytes) = crate::regex::regex_match_bytes(&self.stdout, regex);
         assert!(
-            re.is_match(&self.stdout),
+            ok,
             "stdout does not match:\n{}\nstdout was:\n{}",
-            regex,
-            String::from_utf8_lossy(&self.stderr),
+            regex, bytes
         );
         self
     }
 
     fn assert_stderr_bytes(&self, regex: &str) -> &Self {
-        use regex::bytes::Regex;
-        let re = Regex::new(regex).expect("compiled regex");
+        let (ok, bytes) = crate::regex::regex_match_bytes(&self.stderr, regex);
         assert!(
-            re.is_match(&self.stderr),
-            "stdout does not match:\n{}\nstdout was:\n{}",
-            regex,
-            String::from_utf8_lossy(&self.stderr),
+            ok,
+            "stderr does not match:\n{}\nstderr was:\n{}",
+            regex, bytes
         );
         self
     }
 
     fn stdout_captures_utf8(&self, regex: &str) -> HashMap<CaptureKey, String> {
-        captures_utf8(&self.stdout, regex)
+        crate::regex::captures_utf8(&self.stdout, regex)
     }
 
     fn stderr_captures_utf8(&self, regex: &str) -> HashMap<CaptureKey, String> {
-        captures_utf8(&self.stderr, regex)
+        crate::regex::captures_utf8(&self.stderr, regex)
     }
 }
-
-fn captures_utf8(input: &[u8], regex: &str) -> HashMap<CaptureKey, String> {
-    let mut captures = HashMap::new();
-    use regex::Regex;
-    let re = Regex::new(regex).expect("compiled regex");
-    let text = String::from_utf8_lossy(input);
-
-    use CaptureKey::*;
-
-    if let Some(c) = re.captures(&text) {
-        for n in 0..c.len() {
-            if let Some(m) = c.get(n) {
-                captures.insert(Index(n), String::from(m.as_str()));
-            }
-        }
-
-        for n in re.capture_names() {
-            if let (Some(n), Some(m)) = (n, c.name(n.unwrap_or_default())) {
-                captures.insert(Name(String::from(n)), String::from(m.as_str()));
-            }
-        }
-    };
-
-    captures
-}
-
-/// Captured keys which can be identified by numeric index or by name.
-#[derive(Hash, PartialEq)]
-pub enum CaptureKey {
-    Index(usize),
-    Name(String),
-}
-
-impl Eq for CaptureKey {}
 
 #[cfg(test)]
 #[cfg(unix)]
