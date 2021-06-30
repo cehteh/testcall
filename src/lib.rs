@@ -35,6 +35,6 @@ mod output;
 mod testcall;
 mod testdir;
 
-pub use crate::output::TestOutput;
 pub use crate::testcall::TestCall;
 pub use crate::testdir::{TestDir, TempDirCleanup};
+pub use crate::output::{TestOutput, CaptureKey};
