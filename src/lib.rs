@@ -129,6 +129,16 @@ pub trait TestOutput {
     /// This check matches utf8 text, stdout is lossy convered to utf8 first.
     #[track_caller]
     fn assert_stderr_utf8 (&self, regex: &str) -> &Self;
+
+    /// Applies a regex match check to stdout, will panic when the match failed.
+    /// This check uses the 'bytes' module from the regex package and matches bytes.
+    #[track_caller]
+    fn assert_stdout_bytes(&self, regex: &str) -> &Self;
+
+    /// Applies a regex match check to stderr, will panic when the match failed.
+    /// This check uses the 'bytes' module from the regex package and matches bytes.
+    #[track_caller]
+    fn assert_stderr_bytes(&self, regex: &str) -> &Self;
 }
 
 impl TestOutput for Output {
@@ -148,7 +158,7 @@ impl TestOutput for Output {
     }
 
     fn assert_stdout_utf8(&self, regex: &str) -> &Self {
-        use regex::{Captures, Regex};
+        use regex::Regex;
         let re = Regex::new(regex).expect("compiled regex");
         let text = String::from_utf8_lossy(&self.stdout);
         assert!(
@@ -161,7 +171,7 @@ impl TestOutput for Output {
     }
 
     fn assert_stderr_utf8(&self, regex: &str) -> &Self {
-        use regex::{Captures, Regex};
+        use regex::Regex;
         let re = Regex::new(regex).expect("compiled regex");
         let text = String::from_utf8_lossy(&self.stderr);
         assert!(
@@ -169,6 +179,30 @@ impl TestOutput for Output {
             "stderr does not match:\n{}\nstdout was:\n{}",
             regex,
             text
+        );
+        self
+    }
+
+    fn assert_stdout_bytes(&self, regex: &str) -> &Self {
+        use regex::bytes::Regex;
+        let re = Regex::new(regex).expect("compiled regex");
+        assert!(
+            re.is_match(&self.stdout),
+            "stdout does not match:\n{}\nstdout was:\n{}",
+            regex,
+            String::from_utf8_lossy(&self.stderr),
+        );
+        self
+    }
+
+    fn assert_stderr_bytes(&self, regex: &str) -> &Self {
+        use regex::bytes::Regex;
+        let re = Regex::new(regex).expect("compiled regex");
+        assert!(
+            re.is_match(&self.stderr),
+            "stdout does not match:\n{}\nstdout was:\n{}",
+            regex,
+            String::from_utf8_lossy(&self.stderr),
         );
         self
     }
