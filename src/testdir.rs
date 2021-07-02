@@ -11,8 +11,8 @@ pub trait TestDir {
 
 /// Trait for test directoy objects
 pub trait Fixtures: TestDir {
-    /// Create a file with the given content in the test directory.
-    /// Any leading directories are created automatically.
+    /// Create a file with the given content in the test directory. Any leading directories
+    /// are created automatically. The file itself must not already exist.
     #[track_caller]
     fn create_file<N>(&self, name: &N, content: &[u8]) -> &Self
     where
@@ -29,26 +29,107 @@ pub trait Fixtures: TestDir {
         self
     }
 
+    /// Create a directory within the test directory. Any leading directories
+    /// are created automatically. The path must not exist already.
+    #[track_caller]
+    fn create_dir<N>(&self, name: &N) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_available(self.path(), name);
+        fs::create_dir_all(path).expect("create directory");
+        self
+    }
+
 }
 
 /// Assertions on content of a TestDir
 pub trait Assertions: TestDir {
-    /// Assert that the given file exists
+    /// Assert that at the given path exists
     #[track_caller]
     fn assert_exists<N>(&self, name: &N) -> &Self
     where
         N: AsRef<Path> + ?Sized,
     {
-        let mut path = PathBuf::from(self.path());
-        path.push(name);
-        assert!(
-            path.as_path().exists(),
-            "File {:?} does not exist",
-            name.as_ref()
-        );
+        path_exists(self.path(), name);
         self
     }
 
+    /// Assert that the given path does not exist
+    #[track_caller]
+    fn assert_available<N>(&self, name: &N) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        path_available(self.path(), name);
+        self
+    }
+
+    /// Assert that the given path is a directory
+    #[track_caller]
+    fn assert_is_dir<N>(&self, name: &N) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_exists(self.path(), name);
+        assert!(path.is_dir());
+        self
+    }
+
+    /// Assert that the given path is a file
+    #[track_caller]
+    fn assert_is_file<N>(&self, name: &N) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_exists(self.path(), name);
+        assert!(path.is_file());
+        self
+    }
+
+    /// Assert that the given path is a symlink
+    #[track_caller]
+    fn assert_is_symlink<N>(&self, name: &N) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_exists(self.path(), name);
+        assert!(path.symlink_metadata().unwrap().file_type().is_symlink());
+        self
+    }
+
+    /// Assert that the given path resolves to a element of the given size
+    #[track_caller]
+    fn assert_size<N>(&self, name: &N, size: u64) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_exists(self.path(), name);
+        assert_eq!(path.metadata().unwrap().len(), size);
+        self
+    }
+
+    /// Assert that the given path resolves to a element of more than the given size
+    #[track_caller]
+    fn assert_size_greater<N>(&self, name: &N, size: u64) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_exists(self.path(), name);
+        assert!(path.metadata().unwrap().len() > size);
+        self
+    }
+
+    /// Assert that the given path resolves to a element of less than the given size
+    #[track_caller]
+    fn assert_size_smaller<N>(&self, name: &N, size: u64) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_exists(self.path(), name);
+        assert!(path.metadata().unwrap().len() < size);
+        self
+    }
 }
 
 impl TestDir for Path {
@@ -172,7 +253,6 @@ where
     path
 }
 
-
 #[cfg(test)]
 #[cfg(unix)]
 mod test {
@@ -198,8 +278,44 @@ mod test {
         let tmpdir = TempDir::new().expect("TempDir created");
         println!("TempDir path: {:?}", tmpdir.path());
         tmpdir.create_file("path/to/testfile", "Hello File!".as_bytes());
-
         tmpdir.assert_exists("path/to/testfile");
+    }
+
+    #[test]
+    #[should_panic]
+    fn create_file_fail() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        println!("TempDir path: {:?}", tmpdir.path());
+        tmpdir.create_file("path/to/testfile", "Hello File!".as_bytes());
+        tmpdir.assert_exists("path/to/wrongfile");
+    }
+
+    #[test]
+    #[should_panic]
+    fn create_file_again_fails() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        println!("TempDir path: {:?}", tmpdir.path());
+        tmpdir.create_file("path/to/testfile", "Hello File!".as_bytes());
+        tmpdir.create_file("path/to/testfile", "Hello File again!".as_bytes());
+    }
+
+    #[test]
+    fn create_is_something() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        println!("TempDir path: {:?}", tmpdir.path());
+        tmpdir.create_file("path/to/testfile", "Hello File!".as_bytes());
+        tmpdir
+            .assert_exists("path/to/testfile")
+            .assert_is_file("path/to/testfile")
+            .assert_is_dir("path/to");
+    }
+
+    #[test]
+    fn create_dir() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        println!("TempDir path: {:?}", tmpdir.path());
+        tmpdir.create_dir("path/to/test/dir");
+        tmpdir.assert_is_dir("path/to/test/dir");
     }
 
     #[test]
