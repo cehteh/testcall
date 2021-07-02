@@ -1,3 +1,4 @@
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -8,11 +9,56 @@ pub trait TestDir {
     fn path(&self) -> &Path;
 }
 
+/// Trait for test directoy objects
+pub trait Fixtures: TestDir {
+    /// Create a file with the given content in the test directory.
+    /// Any leading directories are created automatically.
+    #[track_caller]
+    fn create_file<N>(&self, name: &N, content: &[u8]) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let path = path_available(self.path(), name);
+
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create directory");
+        }
+
+        fs::write(path, content).expect("create file");
+
+        self
+    }
+
+}
+
+/// Assertions on content of a TestDir
+pub trait Assertions: TestDir {
+    /// Assert that the given file exists
+    #[track_caller]
+    fn assert_exists<N>(&self, name: &N) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        let mut path = PathBuf::from(self.path());
+        path.push(name);
+        assert!(
+            path.as_path().exists(),
+            "File {:?} does not exist",
+            name.as_ref()
+        );
+        self
+    }
+
+}
+
 impl TestDir for Path {
     fn path(&self) -> &Path {
         self
     }
 }
+
+impl Fixtures for Path {}
+impl Assertions for Path {}
 
 impl TestDir for PathBuf {
     fn path(&self) -> &Path {
@@ -20,11 +66,19 @@ impl TestDir for PathBuf {
     }
 }
 
+impl Fixtures for PathBuf {}
+impl Assertions for PathBuf {}
+
 impl TestDir for TempDir {
     fn path(&self) -> &Path {
         self.path()
     }
 }
+
+impl Fixtures for TempDir {
+    //TODO: implement rm
+}
+impl Assertions for TempDir {}
 
 /// Augment a TempDir with a custom callback function that can do additional cleanup work
 /// (like unmounting filesystem etc.)
@@ -44,6 +98,11 @@ impl TestDir for TempDirCleanup {
         self.dir.path()
     }
 }
+
+impl Fixtures for TempDirCleanup {
+    //TODO: implement rm
+}
+impl Assertions for TempDirCleanup {}
 
 impl TempDirCleanup {
     /// creates a temporary directory with a cleanup function to be called at drop time.

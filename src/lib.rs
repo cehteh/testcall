@@ -46,6 +46,6 @@ mod testdir;
 mod regex;
 
 pub use crate::testcall::TestCall;
-pub use crate::testdir::{TestDir, TempDirCleanup};
+pub use crate::testdir::{TestDir, TempDirCleanup, Fixtures, Assertions};
 pub use crate::output::TestOutput;
 pub use crate::regex::CaptureKey;
