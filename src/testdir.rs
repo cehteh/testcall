@@ -55,11 +55,72 @@ impl TempDirCleanup {
     }
 }
 
+// normalize paths in rust including components that do not exist yet
+trait PathNormalize {
+    fn normalize(&self) -> PathBuf;
+}
+
+impl PathNormalize for Path {
+    fn normalize(&self) -> PathBuf {
+        use std::path::Component::*;
+        let mut normalized = PathBuf::new();
+        for component in self.components() {
+            match component {
+                Prefix(_) | RootDir | Normal(_) => normalized.push(component),
+                CurDir => (),
+                ParentDir => {
+                    if let Some(_) = normalized.parent() {
+                        normalized.pop();
+                    }
+                }
+            }
+            normalized = normalized.canonicalize().unwrap_or(normalized);
+        }
+        normalized
+    }
+}
+
+// concatenate & normalize path and assert that it doesn't escape the inital directory
+fn assert_path<N>(testdir: &Path, subcomponents: &N) -> PathBuf
+where
+    N: AsRef<Path> + ?Sized,
+{
+    let testdir = testdir.canonicalize().expect("absolute existing path");
+    let mut fullpath = PathBuf::from(&testdir);
+    fullpath.push(subcomponents);
+    let path = fullpath.normalize();
+    assert!(path.starts_with(testdir), "escaped into parent dir");
+    path
+}
+
+// + check that it already exists
+fn path_exists<N>(testdir: &Path, subcomponents: &N) -> PathBuf
+where
+    N: AsRef<Path> + ?Sized,
+{
+    let path = assert_path(testdir, subcomponents);
+    assert!(path.exists(), "path exists");
+    path
+}
+
+// + check that it does not exist
+fn path_available<N>(testdir: &Path, subcomponents: &N) -> PathBuf
+where
+    N: AsRef<Path> + ?Sized,
+{
+    let path = assert_path(testdir, subcomponents);
+    assert!(!path.exists(), "path available");
+    path
+}
+
+
 #[cfg(test)]
 #[cfg(unix)]
 mod test {
+    use super::PathNormalize;
     use crate::*;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
+    use tempfile::TempDir;
 
     #[test]
     fn dircleanup() {
@@ -70,9 +131,24 @@ mod test {
             PathBuf::from(tmpdir.path())
         };
 
-        assert!(
-            !std::path::Path::new(&cleaned_up).exists(),
-            "TempDir got deleted"
-        );
+        assert!(!Path::new(&cleaned_up).exists(), "TempDir got deleted");
+    }
+
+    #[test]
+    fn create_file() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        println!("TempDir path: {:?}", tmpdir.path());
+        tmpdir.create_file("path/to/testfile", "Hello File!".as_bytes());
+
+        tmpdir.assert_exists("path/to/testfile");
+    }
+
+    #[test]
+    fn path_normalize() {
+        assert_eq!(Path::new("/foo/bar"), Path::new("/foo/bar").normalize());
+        assert_eq!(Path::new("/foo"), Path::new("/foo/bar/..").normalize());
+        assert_eq!(Path::new("/foo/bar"), Path::new("/foo/./bar/.").normalize());
+        assert_ne!(Path::new("/foo/bar"), Path::new("/foo/bar/..").normalize());
+        assert_eq!(Path::new("foo/bar"), Path::new("./foo/bar").normalize());
     }
 }
