@@ -44,7 +44,7 @@ pub trait Fixtures: TestDir {
 }
 
 /// Assertions on content of a TestDir
-pub trait Assertions: TestDir {
+pub trait DirAssertions: TestDir {
     /// Assert that at the given path exists
     #[track_caller]
     fn assert_exists<N>(&self, name: &N) -> &Self
@@ -139,7 +139,7 @@ impl TestDir for Path {
 }
 
 impl Fixtures for Path {}
-impl Assertions for Path {}
+impl DirAssertions for Path {}
 
 impl TestDir for PathBuf {
     fn path(&self) -> &Path {
@@ -148,7 +148,7 @@ impl TestDir for PathBuf {
 }
 
 impl Fixtures for PathBuf {}
-impl Assertions for PathBuf {}
+impl DirAssertions for PathBuf {}
 
 impl TestDir for TempDir {
     fn path(&self) -> &Path {
@@ -159,7 +159,7 @@ impl TestDir for TempDir {
 impl Fixtures for TempDir {
     //TODO: implement rm
 }
-impl Assertions for TempDir {}
+impl DirAssertions for TempDir {}
 
 /// Augment a TempDir with a custom callback function that can do additional cleanup work
 /// (like unmounting filesystem etc.)
@@ -183,7 +183,7 @@ impl TestDir for TempDirCleanup {
 impl Fixtures for TempDirCleanup {
     //TODO: implement rm
 }
-impl Assertions for TempDirCleanup {}
+impl DirAssertions for TempDirCleanup {}
 
 impl TempDirCleanup {
     /// creates a temporary directory with a cleanup function to be called at drop time.
