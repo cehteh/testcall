@@ -1,7 +1,10 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::io;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
+use crate::CaptureKey;
 
 /// Trait for test directoy objects
 pub trait TestDir {
@@ -41,6 +44,64 @@ pub trait Fixtures: TestDir {
         self
     }
 
+    /// Copy something into the testdir.
+    /// * When 'from' is a directory then all its contents are recursively copied
+    ///   * When 'to' does not exist then the last component of 'from' is created there,
+    ///     any leading dirs are created
+    ///   * When 'to' exists and is a directory then the contents of 'from/*' are copied
+    ///   * When 'to' exists and is a file or symlink it panics
+    /// * When 'from' is a file
+    ///   * When 'to' does not exist any leading dirs are created, with the last component
+    ///     being its new filename, if 'to' is empty then use the original filename
+    ///   * When 'to' exists and is a directory then 'from' is copied into that.
+    ///   * When 'to' exists and is a file it is overwritten with 'from'.
+    ///   * When 'to' exists and is a symlink it panics
+    #[track_caller]
+    fn copy<N, M>(&self, from: &N, to: &M) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+        M: AsRef<Path> + ?Sized,
+    {
+        let from = from.as_ref();
+        assert!(from.exists());
+
+        self
+    }
+
+    #[track_caller]
+    fn symlink<N, M>(&self, from: &N, to: &M) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+        M: AsRef<Path> + ?Sized,
+    {
+        let from = from.as_ref();
+        assert!(from.exists());
+        todo!();
+        self
+    }
+
+    #[track_caller]
+    fn hardlink<N, M>(&self, from: &N, to: &M) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+        M: AsRef<Path> + ?Sized,
+    {
+        let from = from.as_ref();
+        assert!(from.exists());
+        todo!();
+        self
+    }
+
+    /// Delete an element from a testdir. Directories are deleted as well.  This trait
+    /// functions defaults to unimplemented!() because it is deemed to be dangerous. Only the
+    /// trait implementations which create an disposable directory implement it.
+    #[track_caller]
+    fn delete<N>(&self, name: &N) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        unimplemented!()
+    }
 }
 
 /// Assertions on content of a TestDir
@@ -130,6 +191,59 @@ pub trait DirAssertions: TestDir {
         assert!(path.metadata().unwrap().len() < size);
         self
     }
+
+    /// Assert that the two components contain exactly the same things (directories are
+    /// recursed).
+    #[track_caller]
+    fn assert_equal<N, M>(&self, from: &N, to: &M) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+        M: AsRef<Path> + ?Sized,
+    {
+        todo!();
+        self
+    }
+
+    /// Assert that the two components contain the same things (directories are
+    /// recursed) for any existing component on either side.
+    #[track_caller]
+    fn assert_equal_exists<N, M>(&self, from: &N, to: &M) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+        M: AsRef<Path> + ?Sized,
+    {
+        todo!();
+        self
+    }
+
+    /// Assert that a file content matches the given regex in utf8.
+    #[track_caller]
+    fn assert_utf8<N>(&self, name: &N, regex: &str) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        todo!();
+        self
+    }
+
+    /// Assert that a file content matches the given regex in bytes.
+    #[track_caller]
+    fn assert_bytes<N>(&self, name: &N, regex: &str) -> &Self
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        todo!();
+        self
+    }
+
+    /// Return all captures from a regex in utf8.
+    #[track_caller]
+    fn captures_utf8<N>(&self, name: &N, regex: &str) -> HashMap<CaptureKey, String>
+    where
+        N: AsRef<Path> + ?Sized,
+    {
+        todo!()
+    }
 }
 
 impl TestDir for Path {
@@ -187,6 +301,7 @@ impl DirAssertions for TempDirCleanup {}
 
 impl TempDirCleanup {
     /// creates a temporary directory with a cleanup function to be called at drop time.
+    //TODO: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
     pub fn new(cleanup_fn: fn(&TempDir)) -> io::Result<Self> {
         Ok(TempDirCleanup {
             dir: TempDir::new()?,
@@ -262,6 +377,15 @@ mod test {
     use tempfile::TempDir;
 
     #[test]
+    fn path_normalize() {
+        assert_eq!(Path::new("/foo/bar"), Path::new("/foo/bar").normalize());
+        assert_eq!(Path::new("/foo"), Path::new("/foo/bar/..").normalize());
+        assert_eq!(Path::new("/foo/bar"), Path::new("/foo/./bar/.").normalize());
+        assert_ne!(Path::new("/foo/bar"), Path::new("/foo/bar/..").normalize());
+        assert_eq!(Path::new("foo/bar"), Path::new("./foo/bar").normalize());
+    }
+
+    #[test]
     fn dircleanup() {
         let cleaned_up = {
             let tmpdir =
@@ -319,11 +443,109 @@ mod test {
     }
 
     #[test]
-    fn path_normalize() {
-        assert_eq!(Path::new("/foo/bar"), Path::new("/foo/bar").normalize());
-        assert_eq!(Path::new("/foo"), Path::new("/foo/bar/..").normalize());
-        assert_eq!(Path::new("/foo/bar"), Path::new("/foo/./bar/.").normalize());
-        assert_ne!(Path::new("/foo/bar"), Path::new("/foo/bar/..").normalize());
-        assert_eq!(Path::new("foo/bar"), Path::new("./foo/bar").normalize());
+    fn copy_from_dir_to_none() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.copy("src", "");
+        tmpdir.assert_equal("src", "src");
+    }
+
+    #[test]
+    fn copy_from_dir_to_some() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.copy("src", "into/this/dir");
+        tmpdir.assert_equal("src", "into/this/dir/src");
+    }
+
+    #[test]
+    fn copy_from_dir_to_dir() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_dir("other");
+        tmpdir.copy("src", "other");
+        tmpdir.assert_equal("src", "other");
+    }
+
+    #[test]
+    #[should_panic]
+    fn copy_from_dir_to_file() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_file("src", "Hello File!".as_bytes());
+        tmpdir.copy("src", "src");
+    }
+
+    #[test]
+    #[should_panic]
+    fn copy_from_dir_to_symlink() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.symlink("src", "symlink");
+        tmpdir.copy("src", "src");
+    }
+
+    #[test]
+    fn copy_from_file_to_none() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.copy("Cargo.toml", "");
+        tmpdir.assert_equal("Cargo.toml", "Cargo.toml");
+    }
+
+    fn copy_from_file_to_nodir() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.copy("Cargo.toml", "test.toml");
+        tmpdir.assert_equal("Cargo.toml", "test.toml");
+    }
+
+    #[test]
+    fn copy_from_file_to_some() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.copy("Cargo.toml", "other/dir/Cargo.toml");
+        tmpdir.assert_equal("Cargo.toml", "other/dir/Cargo.toml");
+    }
+
+    #[test]
+    fn copy_from_file_to_dir() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_dir("other");
+        tmpdir.copy("Cargo.toml", "other");
+        tmpdir.assert_equal("Cargo.toml", "other/Cargo.toml");
+    }
+
+    #[test]
+    fn copy_from_file_to_file() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_file("Cargo.toml", "Hello File!".as_bytes());
+        tmpdir.copy("Cargo.toml", "Cargo.toml");
+        tmpdir.assert_equal("Cargo.toml", "Cargo.toml");
+    }
+
+    #[test]
+    #[should_panic]
+    fn copy_from_file_to_symlink() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.symlink("Cargo.toml", "symlink");
+        tmpdir.copy("Cargo.toml", "Cargo.toml");
+    }
+
+    #[test]
+    fn hardlink() {
+        todo!();
+    }
+
+    #[test]
+    fn delete() {
+        todo!();
+    }
+
+    #[test]
+    fn assert_utf8() {
+        todo!();
+    }
+
+    #[test]
+    fn assert_bytes() {
+        todo!();
+    }
+
+    #[test]
+    fn captures_utf8() {
+        todo!();
     }
 }
