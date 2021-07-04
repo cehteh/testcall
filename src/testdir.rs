@@ -526,26 +526,55 @@ mod test {
 
     #[test]
     fn hardlink() {
-        todo!();
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_file("testfile", "Hello File!".as_bytes());
+        tmpdir.hardlink("testfile", "testfile");
+        tmpdir.assert_equal("testfile", "testfile");
     }
 
     #[test]
-    fn delete() {
-        todo!();
+    fn delete_in_tempdir() {
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_file("testfile", "Hello File!".as_bytes());
+        tmpdir.delete("testfile");
+        tmpdir.assert_available("testfile");
+    }
+
+    #[test]
+    #[should_panic]
+    fn delete_in_path() {
+        let underlay = TempDir::new().expect("TempDir created");
+        let tmpdir = Path::new(underlay.path());
+        tmpdir.create_file("testfile", "Hello File!".as_bytes());
+        tmpdir.delete("testfile");
     }
 
     #[test]
     fn assert_utf8() {
-        todo!();
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_file("testfile", "Hello File!".as_bytes());
+        tmpdir.assert_utf8("testfile", "Hello File!");
     }
 
     #[test]
     fn assert_bytes() {
-        todo!();
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_file("testfile", "Hello File!".as_bytes());
+        tmpdir.assert_bytes("testfile", "Hello File!");
     }
 
     #[test]
     fn captures_utf8() {
-        todo!();
+        let tmpdir = TempDir::new().expect("TempDir created");
+        tmpdir.create_file("testfile", "Hello File!".as_bytes());
+        let captures = tmpdir.captures_utf8("testfile", "(?P<first>[^ ]*) (?P<second>[^ ]*)");
+
+        use CaptureKey::*;
+
+        assert_eq!(captures[&Index(0)], "Hello File!");
+        assert_eq!(captures[&Index(1)], "Hello");
+        assert_eq!(captures[&Index(2)], "File!");
+        assert_eq!(captures[&Name(String::from("first"))], "Hello");
+        assert_eq!(captures[&Name(String::from("second"))], "File!");
     }
 }
