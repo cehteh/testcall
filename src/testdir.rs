@@ -74,20 +74,19 @@ pub trait Fixtures: TestDir {
         self
     }
 
-    /// Copy something into the testdir.
+    /// Install something (from outside) into the testdir.
     /// * When 'from' is a directory then all its contents are recursively copied
     ///   * When 'to' does not exist then the last component of 'from' is created there,
     ///     any leading dirs are created
     ///   * When 'to' exists and is a directory then the contents of 'from/*' are copied
-    ///   * When 'to' exists and is a file or symlink it panics
+    ///   * When 'to' exists and is a file
     /// * When 'from' is a file
     ///   * When 'to' does not exist any leading dirs are created, with the last component
     ///     being its new filename, if 'to' is empty then use the original filename
     ///   * When 'to' exists and is a directory then 'from' is copied into that.
     ///   * When 'to' exists and is a file it is overwritten with 'from'.
-    ///   * When 'to' exists and is a symlink it panics
     #[track_caller]
-    fn copy<N, M>(&self, from: &N, to: &M) -> &Self
+    fn install<N, M>(&self, from: &N, to: &M) -> &Self
     where
         N: AsRef<Path> + ?Sized,
         M: AsRef<Path> + ?Sized,
@@ -442,85 +441,69 @@ mod test {
     }
 
     #[test]
-    fn copy_from_dir_to_none() {
+    fn install_from_dir_to_none() {
         let tmpdir = TempDir::new().expect("TempDir created");
-        tmpdir.copy("src", "");
+        tmpdir.install("src", "");
         tmpdir.assert_equal("src", "src");
     }
 
     #[test]
-    fn copy_from_dir_to_some() {
+    fn install_from_dir_to_some() {
         let tmpdir = TempDir::new().expect("TempDir created");
-        tmpdir.copy("src", "into/this/dir");
+        tmpdir.install("src", "into/this/dir");
         tmpdir.assert_equal("src", "into/this/dir/src");
     }
 
     #[test]
-    fn copy_from_dir_to_dir() {
+    fn install_from_dir_to_dir() {
         let tmpdir = TempDir::new().expect("TempDir created");
         tmpdir.create_dir("other");
-        tmpdir.copy("src", "other");
+        tmpdir.install("src", "other");
         tmpdir.assert_equal("src", "other");
     }
 
     #[test]
     #[should_panic]
-    fn copy_from_dir_to_file() {
+    fn install_from_dir_to_file() {
         let tmpdir = TempDir::new().expect("TempDir created");
         tmpdir.create_file("src", "Hello File!".as_bytes());
-        tmpdir.copy("src", "src");
+        tmpdir.install("src", "src");
     }
 
     #[test]
-    #[should_panic]
-    fn copy_from_dir_to_symlink() {
+    fn install_from_file_to_none() {
         let tmpdir = TempDir::new().expect("TempDir created");
-        tmpdir.symlink("src", "symlink");
-        tmpdir.copy("src", "src");
-    }
-
-    #[test]
-    fn copy_from_file_to_none() {
-        let tmpdir = TempDir::new().expect("TempDir created");
-        tmpdir.copy("Cargo.toml", "");
+        tmpdir.install("Cargo.toml", "");
         tmpdir.assert_equal("Cargo.toml", "Cargo.toml");
     }
 
-    fn copy_from_file_to_nodir() {
+    fn install_from_file_to_nodir() {
         let tmpdir = TempDir::new().expect("TempDir created");
-        tmpdir.copy("Cargo.toml", "test.toml");
+        tmpdir.install("Cargo.toml", "test.toml");
         tmpdir.assert_equal("Cargo.toml", "test.toml");
     }
 
     #[test]
-    fn copy_from_file_to_some() {
+    fn install_from_file_to_some() {
         let tmpdir = TempDir::new().expect("TempDir created");
-        tmpdir.copy("Cargo.toml", "other/dir/Cargo.toml");
+        tmpdir.install("Cargo.toml", "other/dir/Cargo.toml");
         tmpdir.assert_equal("Cargo.toml", "other/dir/Cargo.toml");
     }
 
     #[test]
-    fn copy_from_file_to_dir() {
+    fn install_from_file_to_dir() {
         let tmpdir = TempDir::new().expect("TempDir created");
         tmpdir.create_dir("other");
-        tmpdir.copy("Cargo.toml", "other");
+        tmpdir.install("Cargo.toml", "other");
         tmpdir.assert_equal("Cargo.toml", "other/Cargo.toml");
     }
 
     #[test]
-    fn copy_from_file_to_file() {
+    fn install_from_file_to_file() {
         let tmpdir = TempDir::new().expect("TempDir created");
         tmpdir.create_file("Cargo.toml", "Hello File!".as_bytes());
-        tmpdir.copy("Cargo.toml", "Cargo.toml");
+        tmpdir.install("Cargo.toml", "Cargo.toml");
         tmpdir.assert_equal("Cargo.toml", "Cargo.toml");
-    }
-
-    #[test]
-    #[should_panic]
-    fn copy_from_file_to_symlink() {
-        let tmpdir = TempDir::new().expect("TempDir created");
-        tmpdir.symlink("Cargo.toml", "symlink");
-        tmpdir.copy("Cargo.toml", "Cargo.toml");
     }
 
     #[test]
