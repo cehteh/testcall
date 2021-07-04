@@ -8,8 +8,38 @@ use crate::CaptureKey;
 
 /// Trait for test directoy objects
 pub trait TestDir {
-    /// Returns the underlying Path of an TestDir implementation
+    /// Return the underlying Path of an TestDir implementation
     fn path(&self) -> &Path;
+
+    /// Return a canonalized/normalized PathBuf to components within the testdir. Assert and
+    /// panic when path escapes from the testdir. Handles non existing components.
+    #[track_caller]
+    fn sub_path(&self, subcomponents: &Path) -> PathBuf {
+        let testdir = self.path();
+        let mut fullpath = PathBuf::from(&testdir);
+        fullpath.push(subcomponents);
+        let path = fullpath.normalize();
+        assert!(path.starts_with(testdir), "escaped from testdir");
+        path
+    }
+
+    /// Return a canonalized/normalized PathBuf to components within the testdir. Assert and
+    /// panic when path escapes from the testdir. Asserts that the given subpath exists.
+    #[track_caller]
+    fn sub_path_exists(&self, subcomponents: &Path) -> PathBuf {
+        let path = self.sub_path(subcomponents);
+        assert!(path.exists(), "path exists");
+        path
+    }
+
+    /// Return a canonalized/normalized PathBuf to components within the testdir. Assert and
+    /// panic when path escapes from the testdir. Asserts that the given subpath does not exist.
+    #[track_caller]
+    fn sub_path_available(&self, subcomponents: &Path) -> PathBuf {
+        let path = self.sub_path(subcomponents);
+        assert!(!path.exists(), "path does not exist");
+        path
+    }
 }
 
 /// Trait for test directoy objects
@@ -21,7 +51,7 @@ pub trait Fixtures: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_available(self.path(), name);
+        let path = self.sub_path_available(name.as_ref());
 
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).expect("create directory");
@@ -39,7 +69,7 @@ pub trait Fixtures: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_available(self.path(), name);
+        let path = self.sub_path_available(name.as_ref());
         fs::create_dir_all(path).expect("create directory");
         self
     }
@@ -108,21 +138,23 @@ pub trait Fixtures: TestDir {
 pub trait DirAssertions: TestDir {
     /// Assert that at the given path exists
     #[track_caller]
-    fn assert_exists<N>(&self, name: &N) -> &Self
+    fn assert_exists<N>(&self, subpath: &N) -> &Self
     where
         N: AsRef<Path> + ?Sized,
     {
-        path_exists(self.path(), name);
+        let path = self.sub_path(subpath.as_ref());
+        assert!(path.exists(), "path exists");
         self
     }
 
     /// Assert that the given path does not exist
     #[track_caller]
-    fn assert_available<N>(&self, name: &N) -> &Self
+    fn assert_available<N>(&self, subpath: &N) -> &Self
     where
         N: AsRef<Path> + ?Sized,
     {
-        path_available(self.path(), name);
+        let path = self.sub_path(subpath.as_ref());
+        assert!(!path.exists(), "path does not exist");
         self
     }
 
@@ -132,7 +164,7 @@ pub trait DirAssertions: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_exists(self.path(), name);
+        let path = self.sub_path_exists(name.as_ref());
         assert!(path.is_dir());
         self
     }
@@ -143,7 +175,7 @@ pub trait DirAssertions: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_exists(self.path(), name);
+        let path = self.sub_path_exists(name.as_ref());
         assert!(path.is_file());
         self
     }
@@ -154,7 +186,7 @@ pub trait DirAssertions: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_exists(self.path(), name);
+        let path = self.sub_path_exists(name.as_ref());
         assert!(path.symlink_metadata().unwrap().file_type().is_symlink());
         self
     }
@@ -165,7 +197,7 @@ pub trait DirAssertions: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_exists(self.path(), name);
+        let path = self.sub_path_exists(name.as_ref());
         assert_eq!(path.metadata().unwrap().len(), size);
         self
     }
@@ -176,7 +208,7 @@ pub trait DirAssertions: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_exists(self.path(), name);
+        let path = self.sub_path_exists(name.as_ref());
         assert!(path.metadata().unwrap().len() > size);
         self
     }
@@ -187,7 +219,7 @@ pub trait DirAssertions: TestDir {
     where
         N: AsRef<Path> + ?Sized,
     {
-        let path = path_exists(self.path(), name);
+        let path = self.sub_path_exists(name.as_ref());
         assert!(path.metadata().unwrap().len() < size);
         self
     }
@@ -333,39 +365,6 @@ impl PathNormalize for Path {
         }
         normalized
     }
-}
-
-// concatenate & normalize path and assert that it doesn't escape the inital directory
-fn assert_path<N>(testdir: &Path, subcomponents: &N) -> PathBuf
-where
-    N: AsRef<Path> + ?Sized,
-{
-    let testdir = testdir.canonicalize().expect("absolute existing path");
-    let mut fullpath = PathBuf::from(&testdir);
-    fullpath.push(subcomponents);
-    let path = fullpath.normalize();
-    assert!(path.starts_with(testdir), "escaped into parent dir");
-    path
-}
-
-// + check that it already exists
-fn path_exists<N>(testdir: &Path, subcomponents: &N) -> PathBuf
-where
-    N: AsRef<Path> + ?Sized,
-{
-    let path = assert_path(testdir, subcomponents);
-    assert!(path.exists(), "path exists");
-    path
-}
-
-// + check that it does not exist
-fn path_available<N>(testdir: &Path, subcomponents: &N) -> PathBuf
-where
-    N: AsRef<Path> + ?Sized,
-{
-    let path = assert_path(testdir, subcomponents);
-    assert!(!path.exists(), "path available");
-    path
 }
 
 #[cfg(test)]
