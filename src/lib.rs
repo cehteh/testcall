@@ -8,7 +8,7 @@
 //! grow in future.
 //!
 //!
-//! # Example
+//! # Initial Example
 //!
 //! ```rust
 //! #[test]
@@ -32,20 +32,38 @@
 //! reported.
 //!
 //!
+//! # Concepts and Facilities
+//!
+//! augmenting standard/existing things assert capture regex
+//! ## Regular Expressions and Captures
+//!
+//!
+//!
+//!
+//! ## TestCall
+//!
+//! Allows setting up and calling programs build by your project through the 'bintest' crate
+//! or any other executable. Augments 'std::process::Command'. The result of running tests is
+//! collected and returned in a 'std::process::Output'.
+//!
+//!
+//! ## TestOutput
+//!
+//! A Trait that augments 'std::process::Output' with assertions and regex capturing functions
+//! to validate the result of a test run. Note that 'std::process::Output' stores the results
+//! of a call in memory. Thus testing should not generate excessive outputs (on
+//! stdout/stderr).
+//!
+//!
 //! # Future Plans
 //!
 //! New features will be added as needed, PR's are welcome. This is work in progress.
 //!
-//! Things to be done soon are:
-//!  * Populating TestDirs from template directories
-//!  * Validating directory contents
 //!
 mod output;
-mod testcall;
-mod testdir;
 mod regex;
+mod testcall;
 
-pub use crate::testcall::TestCall;
-pub use crate::testdir::{TestDir, TempDirCleanup, Fixtures, DirAssertions};
 pub use crate::output::TestOutput;
 pub use crate::regex::CaptureKey;
+pub use crate::testcall::TestCall;

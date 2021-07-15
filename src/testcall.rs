@@ -1,9 +1,7 @@
 use bintest::BinTest;
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-
-use crate::TestDir;
 
 enum ExeLocation<'a> {
     BinTest {
@@ -17,8 +15,8 @@ enum ExeLocation<'a> {
 /// provides functions to call this multiple times.
 pub struct TestCall<'a> {
     executable: ExeLocation<'a>,
-    dir: Option<Box<dyn TestDir>>,
-    //PLANNED env: env_clear: env_remove...,
+    dir: Option<PathBuf>, //TODO: should be a reference with lifetime to a TestPath
+                          //PLANNED env: env_clear: env_remove...,
 }
 
 impl<'a> TestCall<'a> {
@@ -39,8 +37,8 @@ impl<'a> TestCall<'a> {
     }
 
     /// Sets the current dir in which the next call shall execute
-    pub fn current_dir(&mut self, dir: Box<dyn TestDir>) -> &mut Self {
-        self.dir = Some(dir);
+    pub fn current_dir(&mut self, dir: &Path) -> &mut Self {
+        self.dir = Some(PathBuf::from(dir));
         self
     }
 
@@ -57,7 +55,7 @@ impl<'a> TestCall<'a> {
             ExeLocation::External(path) => Command::new(path),
         };
         if let Some(dir) = &self.dir {
-            command.current_dir(dir.path());
+            command.current_dir(dir);
         }
         //PLANNED: env vars
         let output = command.args(args).output().expect("called command");
@@ -65,12 +63,11 @@ impl<'a> TestCall<'a> {
     }
 }
 
-
 #[cfg(test)]
 #[cfg(unix)]
 mod test {
-    use std::path::Path;
     use crate::*;
+    use std::path::Path;
 
     #[test]
     fn echo() {

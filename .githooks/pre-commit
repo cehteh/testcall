@@ -1,11 +1,15 @@
 #!/bin/bash
-# install this by: ln -s ./.githooks/pre-commit .git/hooks/pre-commit
+# install this by: cp -f .githooks/pre-commit .git/hooks/pre-commit
 
 KEEP_TESTS=5
 WORKTREE_DIR="$PWD"
 TIMEOUT_SECS=10
 MEMORY_KB=16777216
 TEST_PREFIX=".tests-"
+
+if ! cmp .githooks/pre-commit .git/hooks/pre-commit; then
+    echo ".githooks/pre-commit is out of date, please reinstall it"
+fi
 
 cd "$WORKTREE_DIR"
 find -name "${TEST_PREFIX}*" -type d | sort -n | head -n -$KEEP_TESTS | xargs -r rm -r

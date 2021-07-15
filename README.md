@@ -24,8 +24,3 @@ fn myprogram_test() {
 # Future Plans
 
 New features will be added as needed, PR’s are welcome. This is work in progress.
-
-Things to be done soon are:
-
- * Populating TestDirs from template directories
- * Validating directory contents
