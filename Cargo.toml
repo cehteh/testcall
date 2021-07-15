@@ -8,7 +8,6 @@ repository = "https://github.com/cehteh/testcall.git"
 keywords = ["testing"]
 
 [dependencies]
-tempfile = "3.2"
 bintest = "1.0"
 regex = "1"
 
