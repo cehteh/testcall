@@ -61,7 +61,7 @@
 //!
 //!
 mod output;
-mod regex;
+pub mod regex;
 mod testcall;
 
 pub use crate::output::TestOutput;
