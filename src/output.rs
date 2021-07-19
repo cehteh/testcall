@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::process::Output;
 
-use crate::CaptureKey;
+use crate::Captured;
 
 /// Augment std::process::Output with testing and assertions
 pub trait TestOutput {
@@ -39,11 +38,11 @@ pub trait TestOutput {
 
     /// Applies a regex on stdout, returns named captures as CaptureKey:String map.
     /// Matches utf8 text, input is lossy convered to utf8 first.
-    fn stdout_captures_utf8(&self, regex: &str) -> HashMap<CaptureKey, String>;
+    fn stdout_captures_utf8(&self, regex: &str) -> Captured;
 
     /// Applies a regex on stderr, returns named captures as CaptureKey:String map.
     /// Matches utf8 text, input is lossy convered to utf8 first.
-    fn stderr_captures_utf8(&self, regex: &str) -> HashMap<CaptureKey, String>;
+    fn stderr_captures_utf8(&self, regex: &str) -> Captured;
 }
 
 impl TestOutput for Output {
@@ -104,11 +103,11 @@ impl TestOutput for Output {
         self
     }
 
-    fn stdout_captures_utf8(&self, regex: &str) -> HashMap<CaptureKey, String> {
+    fn stdout_captures_utf8(&self, regex: &str) -> Captured {
         crate::regex::captures_utf8(&self.stdout, regex)
     }
 
-    fn stderr_captures_utf8(&self, regex: &str) -> HashMap<CaptureKey, String> {
+    fn stderr_captures_utf8(&self, regex: &str) -> Captured {
         crate::regex::captures_utf8(&self.stderr, regex)
     }
 }
@@ -127,12 +126,10 @@ mod test {
             .call(["Hello World!"])
             .stdout_captures_utf8("(?P<first>[^ ]*) (?P<second>[^ ]*)");
 
-        use CaptureKey::*;
-
-        assert_eq!(captures[&Index(0)], "Hello World!\n");
-        assert_eq!(captures[&Index(1)], "Hello");
-        assert_eq!(captures[&Index(2)], "World!\n");
-        assert_eq!(captures[&Name(String::from("first"))], "Hello");
-        assert_eq!(captures[&Name(String::from("second"))], "World!\n");
+        assert_eq!(&captures[0], "Hello World!\n");
+        assert_eq!(&captures[1], "Hello");
+        assert_eq!(&captures[2], "World!\n");
+        assert_eq!(&captures["first"], "Hello");
+        assert_eq!(&captures["second"], "World!\n");
     }
 }

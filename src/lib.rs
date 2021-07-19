@@ -65,5 +65,5 @@ pub mod regex;
 mod testcall;
 
 pub use crate::output::TestOutput;
-pub use crate::regex::CaptureKey;
+pub use crate::regex::Captured;
 pub use crate::testcall::TestCall;
