@@ -1,27 +1,28 @@
 use bintest::BinTest;
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output};
+use testpath::TestPath;
 
 enum ExeLocation<'a> {
     BinTest {
         executables: &'a BinTest,
-        name: &'static str,
+        name: &'a str,
     },
-    External(&'static Path),
+    External(&'a Path),
 }
 
 /// A TestCall object binds a BinTest::Command to a single executable and environment and
 /// provides functions to call this multiple times.
 pub struct TestCall<'a> {
     executable: ExeLocation<'a>,
-    dir: Option<PathBuf>, //TODO: should be a reference with lifetime to a TestPath
-                          //PLANNED env: env_clear: env_remove...,
+    dir: Option<&'a dyn TestPath>,
+    //PLANNED env: env_clear: env_remove...,
 }
 
 impl<'a> TestCall<'a> {
     /// Creates a new testcall object for 'name' from the current crates executables.
-    pub fn new(executables: &'a BinTest, name: &'static str) -> TestCall<'a> {
+    pub fn new(executables: &'a BinTest, name: &'a str) -> TestCall<'a> {
         TestCall {
             executable: ExeLocation::BinTest { executables, name },
             dir: None,
@@ -29,7 +30,7 @@ impl<'a> TestCall<'a> {
     }
 
     /// Creates a new testcall object for an external command given by path.
-    pub fn external_command(path: &'static Path) -> TestCall<'a> {
+    pub fn external_command(path: &'a Path) -> TestCall<'a> {
         TestCall {
             executable: ExeLocation::External(path),
             dir: None,
@@ -37,8 +38,8 @@ impl<'a> TestCall<'a> {
     }
 
     /// Sets the current dir in which the next call shall execute
-    pub fn current_dir(&mut self, dir: &Path) -> &mut Self {
-        self.dir = Some(PathBuf::from(dir));
+    pub fn current_dir(&mut self, dir: &'a dyn TestPath) -> &mut Self {
+        self.dir = Some(dir);
         self
     }
 
@@ -55,7 +56,7 @@ impl<'a> TestCall<'a> {
             ExeLocation::External(path) => Command::new(path),
         };
         if let Some(dir) = &self.dir {
-            command.current_dir(dir);
+            command.current_dir(dir.path());
         }
         //PLANNED: env vars
         let output = command.args(args).output().expect("called command");
