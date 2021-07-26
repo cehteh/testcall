@@ -16,7 +16,6 @@
 //!     let executables = BinTest::new();
 //!     let mut myprogram = TestCall::new(&executables, "myprogram");
 //!
-//!     myprogram.current_dir(Box::new(TempDir::new().expect("created tempdir")));
 //!     myprogram
 //!         .call(["--version"])
 //!         .assert_success()
