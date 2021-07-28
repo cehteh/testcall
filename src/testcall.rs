@@ -69,15 +69,15 @@ impl<'a> TestCall<'a> {
         if envs.peek().is_some() {
             command.env_clear();
             command.envs(envs);
-         }
+        }
 
         let output = command.args(args).output().expect("called command");
         output
     }
 }
 
-pub static NO_ARGS: [&OsStr; 0] = [];
-pub static NO_ENVS: [(&OsStr,&OsStr); 0] = [];
+pub const NO_ARGS: [&OsStr; 0] = [];
+pub const NO_ENVS: [(&OsStr, &OsStr); 0] = [];
 
 #[cfg(test)]
 #[cfg(unix)]
