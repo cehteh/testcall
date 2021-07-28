@@ -123,7 +123,7 @@ mod test {
         let testcall = TestCall::external_command(Path::new("echo"));
 
         let captures = testcall
-            .call(["Hello World!"])
+            .call(["Hello World!"], NO_ENVS)
             .stdout_captures_utf8("(?P<first>[^ ]*) (?P<second>[^ ]*)");
 
         assert_eq!(&captures[0], "Hello World!\n");

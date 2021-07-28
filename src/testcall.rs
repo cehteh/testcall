@@ -44,12 +44,18 @@ impl<'a> TestCall<'a> {
     }
 
     /// Calls the executable with the given arguments and expects successful exit.
+    /// `args` can be `NO_ARGS` or something iterateable that yields the arguments.
+    /// `envs` can be `NO_ENVS` or something iterateable that yields the key/value pairs.
+    /// When any envs are given then the environment is cleared first.
     /// Returns a TestOutput object for further investigation.
     #[track_caller]
-    pub fn call<I, S>(&self, args: I) -> Output
+    pub fn call<IA, S, IE, K, V>(&self, args: IA, envs: IE) -> Output
     where
-        I: IntoIterator<Item = S>,
+        IA: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
+        IE: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
     {
         let mut command = match self.executable {
             ExeLocation::BinTest { executables, name } => executables.command(name),
@@ -58,11 +64,20 @@ impl<'a> TestCall<'a> {
         if let Some(dir) = &self.dir {
             command.current_dir(dir.path());
         }
-        //PLANNED: env vars
+
+        let mut envs = envs.into_iter().fuse().peekable();
+        if envs.peek().is_some() {
+            command.env_clear();
+            command.envs(envs);
+         }
+
         let output = command.args(args).output().expect("called command");
         output
     }
 }
+
+pub static NO_ARGS: [&OsStr; 0] = [];
+pub static NO_ENVS: [(&OsStr,&OsStr); 0] = [];
 
 #[cfg(test)]
 #[cfg(unix)]
@@ -71,11 +86,21 @@ mod test {
     use std::path::Path;
 
     #[test]
+    fn echo_no_args() {
+        let testcall = TestCall::external_command(Path::new("echo"));
+
+        testcall
+            .call(NO_ARGS, NO_ENVS)
+            .assert_success()
+            .assert_stdout_utf8("");
+    }
+
+    #[test]
     fn echo() {
         let testcall = TestCall::external_command(Path::new("echo"));
 
         testcall
-            .call(["Hello World!"])
+            .call(["Hello World!"], NO_ENVS)
             .assert_success()
             .assert_stdout_utf8("Hello World!");
     }
@@ -86,7 +111,7 @@ mod test {
         let testcall = TestCall::external_command(Path::new("echo"));
 
         testcall
-            .call(["No World!"])
+            .call(["No World!"], NO_ENVS)
             .assert_success()
             .assert_stdout_utf8("Hello World!");
     }
