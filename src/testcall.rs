@@ -17,7 +17,6 @@ enum ExeLocation<'a> {
 pub struct TestCall<'a> {
     executable: ExeLocation<'a>,
     dir: Option<&'a dyn TestPath>,
-    //PLANNED env: env_clear: env_remove...,
 }
 
 impl<'a> TestCall<'a> {
@@ -49,7 +48,7 @@ impl<'a> TestCall<'a> {
     /// When any envs are given then the environment is cleared first.
     /// Returns a TestOutput object for further investigation.
     #[track_caller]
-    pub fn call<IA, S, IE, K, V>(&self, args: IA, envs: IE) -> Output
+    pub fn call_args_envs<IA, S, IE, K, V>(&self, args: IA, envs: IE) -> Output
     where
         IA: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
@@ -74,6 +73,43 @@ impl<'a> TestCall<'a> {
         let output = command.args(args).output().expect("called command");
         output
     }
+
+    /// Calls the executable with the given arguments and expects successful exit.
+    /// `args` can be `NO_ARGS` or something iterateable that yields the arguments.
+    /// Returns a TestOutput object for further investigation.
+    #[inline]
+    #[track_caller]
+    pub fn call_args<IA, S>(&self, args: IA) -> Output
+    where
+        IA: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        self.call_args_envs(args, NO_ENVS)
+    }
+
+    /// Calls the executable without arguments and expects successful exit.
+    /// `envs` can be `NO_ENVS` or something iterateable that yields the key/value pairs.
+    /// When any envs are given then the environment is cleared first.
+    /// Returns a TestOutput object for further investigation.
+    #[inline]
+    #[track_caller]
+    pub fn call_envs<IE, K, V>(&self, envs: IE) -> Output
+    where
+        IE: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        self.call_args_envs(NO_ARGS, envs)
+    }
+
+    /// Calls the executable without arguments and expects successful exit.
+    /// Returns a TestOutput object for further investigation.
+    #[inline]
+    #[track_caller]
+    pub fn call(&self) -> Output
+    {
+        self.call_args_envs(NO_ARGS, NO_ENVS)
+    }
 }
 
 pub const NO_ARGS: [&OsStr; 0] = [];
@@ -90,7 +126,7 @@ mod test {
         let testcall = TestCall::external_command(Path::new("echo"));
 
         testcall
-            .call(NO_ARGS, NO_ENVS)
+            .call()
             .assert_success()
             .assert_stdout_utf8("");
     }
@@ -100,7 +136,7 @@ mod test {
         let testcall = TestCall::external_command(Path::new("echo"));
 
         testcall
-            .call(["Hello World!"], NO_ENVS)
+            .call_args(["Hello World!"])
             .assert_success()
             .assert_stdout_utf8("Hello World!");
     }
@@ -111,7 +147,7 @@ mod test {
         let testcall = TestCall::external_command(Path::new("echo"));
 
         testcall
-            .call(["No World!"], NO_ENVS)
+            .call_args(["No World!"])
             .assert_success()
             .assert_stdout_utf8("Hello World!");
     }

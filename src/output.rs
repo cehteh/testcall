@@ -61,8 +61,6 @@ impl TestOutput for Output {
         self
     }
 
-    //PLANNED: make a HashMap<String, Regex> to cache compiled regex
-
     fn assert_stdout_utf8(&self, regex: &str) -> &Self {
         let (ok, utf8) = crate::regex::regex_match_utf8(&self.stdout, regex);
         assert!(
@@ -123,7 +121,7 @@ mod test {
         let testcall = TestCall::external_command(Path::new("echo"));
 
         let captures = testcall
-            .call(["Hello World!"], NO_ENVS)
+            .call_args(["Hello World!"])
             .stdout_captures_utf8("(?P<first>[^ ]*) (?P<second>[^ ]*)");
 
         assert_eq!(&captures[0], "Hello World!\n");
