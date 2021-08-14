@@ -1,7 +1,7 @@
 use bintest::BinTest;
 use std::ffi::OsStr;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Child, Command, Output, Stdio};
 use testpath::TestPath;
 
 enum ExeLocation<'a> {
@@ -109,10 +109,97 @@ impl<'a> TestCall<'a> {
     pub fn call(&self) -> Output {
         self.call_args_envs(NO_ARGS, NO_ENVS)
     }
+
+    /// Spawns executable with the given arguments and environment in the background.
+    /// `args` can be `NO_ARGS` or something iterateable that yields the arguments.
+    /// `envs` can be `NO_ENVS` or something iterateable that yields the key/value pairs.
+    /// When any envs are given then the environment is cleared first.
+    /// Stdout and stderr are rigged to be piped back to the caller to be collected by
+    /// The TestChild::wait().
+    /// Returns a TestChild object for later investigation.
+    #[track_caller]
+    pub fn spawn_args_envs<IA, S, IE, K, V>(&self, args: IA, envs: IE) -> TestChild
+    where
+        IA: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+        IE: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        let mut command = match self.executable {
+            ExeLocation::BinTest { executables, name } => executables.command(name),
+            ExeLocation::External(path) => Command::new(path),
+        };
+        if let Some(dir) = &self.dir {
+            command.current_dir(dir.path());
+        }
+
+        let mut envs = envs.into_iter().fuse().peekable();
+        if envs.peek().is_some() {
+            command.env_clear();
+            command.envs(envs);
+        }
+
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        TestChild(command.args(args).spawn().expect("spawned command"))
+    }
+
+    /// Spawns the executable with the given arguments into background.
+    /// `args` can be `NO_ARGS` or something iterateable that yields the arguments.
+    /// Returns a TestChild object for later investigation.
+    #[inline]
+    #[track_caller]
+    pub fn spawn_args<IA, S>(&self, args: IA) -> TestChild
+    where
+        IA: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        self.spawn_args_envs(args, NO_ENVS)
+    }
+
+    /// Spawns the executable without arguments into background.
+    /// `envs` can be `NO_ENVS` or something iterateable that yields the key/value pairs.
+    /// When any envs are given then the environment is cleared first.
+    /// Returns a TestChild object for later investigation.
+    #[inline]
+    #[track_caller]
+    pub fn spawn_envs<IE, K, V>(&self, envs: IE) -> TestChild
+    where
+        IE: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        self.spawn_args_envs(NO_ARGS, envs)
+    }
+
+    /// Spawns the executable without arguments into background.
+    /// Returns a TestChild object for later investigation.
+    #[inline]
+    #[track_caller]
+    pub fn spawn(&self) -> TestChild {
+        self.spawn_args_envs(NO_ARGS, NO_ENVS)
+    }
 }
 
 pub const NO_ARGS: [&OsStr; 0] = [];
 pub const NO_ENVS: [(&OsStr, &OsStr); 0] = [];
+
+/// The handle to background processes
+pub struct TestChild(Child);
+
+impl TestChild {
+    /// Waits for the completion of a child process and returns
+    /// a Output object for further investigation.
+    pub fn wait(self) -> Output {
+        self.0.wait_with_output().expect("wait success")
+    }
+
+    /// Kills a child process unconditionally.
+    pub fn kill(mut self) {
+        let _ = self.0.kill();
+    }
+}
 
 #[cfg(test)]
 #[cfg(unix)]
@@ -124,10 +211,7 @@ mod test {
     fn echo_no_args() {
         let testcall = TestCall::external_command(Path::new("echo"));
 
-        testcall
-            .call()
-            .assert_success()
-            .assert_stdout_utf8("");
+        testcall.call().assert_success().assert_stdout_utf8("");
     }
 
     #[test]
@@ -147,6 +231,20 @@ mod test {
 
         testcall
             .call_args(["No World!"])
+            .assert_success()
+            .assert_stdout_utf8("Hello World!");
+    }
+
+    #[test]
+    fn spawn() {
+        let testcall = TestCall::external_command(Path::new("echo"));
+
+        let child = testcall.spawn_args_envs(["Hello World!"], NO_ENVS);
+
+        println!("child spawned");
+
+        child
+            .wait()
             .assert_success()
             .assert_stdout_utf8("Hello World!");
     }

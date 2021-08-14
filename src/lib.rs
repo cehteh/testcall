@@ -65,5 +65,5 @@ mod testcall;
 
 pub use crate::output::TestOutput;
 pub use crate::regex::Captured;
-pub use crate::testcall::TestCall;
+pub use crate::testcall::{TestCall, TestChild};
 pub use crate::testcall::{NO_ARGS, NO_ENVS};
