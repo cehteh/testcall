@@ -42,11 +42,11 @@ impl<'a> TestCall<'a> {
         self
     }
 
-    /// Calls the executable with the given arguments and expects successful exit.
+    /// Calls the executable with the given arguments and environment.
     /// `args` can be `NO_ARGS` or something iterateable that yields the arguments.
     /// `envs` can be `NO_ENVS` or something iterateable that yields the key/value pairs.
     /// When any envs are given then the environment is cleared first.
-    /// Returns a TestOutput object for further investigation.
+    /// Returns a Output object for further investigation.
     #[track_caller]
     pub fn call_args_envs<IA, S, IE, K, V>(&self, args: IA, envs: IE) -> Output
     where
@@ -74,9 +74,9 @@ impl<'a> TestCall<'a> {
         output
     }
 
-    /// Calls the executable with the given arguments and expects successful exit.
+    /// Calls the executable with the given arguments.
     /// `args` can be `NO_ARGS` or something iterateable that yields the arguments.
-    /// Returns a TestOutput object for further investigation.
+    /// Returns a Output object for further investigation.
     #[inline]
     #[track_caller]
     pub fn call_args<IA, S>(&self, args: IA) -> Output
@@ -87,10 +87,10 @@ impl<'a> TestCall<'a> {
         self.call_args_envs(args, NO_ENVS)
     }
 
-    /// Calls the executable without arguments and expects successful exit.
+    /// Calls the executable without arguments.
     /// `envs` can be `NO_ENVS` or something iterateable that yields the key/value pairs.
     /// When any envs are given then the environment is cleared first.
-    /// Returns a TestOutput object for further investigation.
+    /// Returns a Output object for further investigation.
     #[inline]
     #[track_caller]
     pub fn call_envs<IE, K, V>(&self, envs: IE) -> Output
@@ -102,12 +102,11 @@ impl<'a> TestCall<'a> {
         self.call_args_envs(NO_ARGS, envs)
     }
 
-    /// Calls the executable without arguments and expects successful exit.
-    /// Returns a TestOutput object for further investigation.
+    /// Calls the executable without arguments.
+    /// Returns a Output object for further investigation.
     #[inline]
     #[track_caller]
-    pub fn call(&self) -> Output
-    {
+    pub fn call(&self) -> Output {
         self.call_args_envs(NO_ARGS, NO_ENVS)
     }
 }
