@@ -87,6 +87,16 @@ impl<'a> TestCall<'a> {
         self.call_args_envs(args, NO_ENVS)
     }
 
+    /// Convinience method to call the executable with the given arguments.
+    /// `args` is a single '&str' split at ascii_whitespace. It is important to note that this
+    /// only works when the arguments themself do not contain whitespace characters (like
+    /// quoted strings "Hello World"). Returns a Output object for further investigation.
+    #[inline]
+    #[track_caller]
+    pub fn call_argstr(&self, args: &str) -> Output {
+        self.call_args_envs(args.split_ascii_whitespace(), NO_ENVS)
+    }
+
     /// Calls the executable without arguments.
     /// `envs` can be `NO_ENVS` or something iterateable that yields the key/value pairs.
     /// When any envs are given then the environment is cleared first.
@@ -233,6 +243,16 @@ mod test {
             .call_args(["No World!"])
             .assert_success()
             .assert_stdout_utf8("Hello World!");
+    }
+
+    #[test]
+    fn argstr() {
+        let testcall = TestCall::external_command(Path::new("ls"));
+
+        testcall
+            .call_argstr("-lh Cargo.toml")
+            .assert_success()
+            .assert_stdout_utf8("^[^ ]* .*Cargo.toml\n$");
     }
 
     #[test]
